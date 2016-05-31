@@ -1,12 +1,13 @@
-defmodule Hedwig.Adapters.Flowdock.Connection do
+defmodule Hedwig.Adapters.Flowdock.RestConnection do
   use Connection
 
   require Logger
 
   @timeout 5_000
-  @endpoint "stream.flowdock.com"
+  @endpoint "api.flowdock.com"
 
   defstruct conn: nil,
+            s_conn: nil,
             host: nil,
             path: nil,
             port: nil,
@@ -43,12 +44,19 @@ defmodule Hedwig.Adapters.Flowdock.Connection do
     {:connect, :init, state}
   end
 
+  def send_message(conn, message) do
+#    ref = :gun.post(conn, to_char_list("/messages"), headers)
+  end
+
   def connect(info, %{host: host, port: port} = state) when info in [:init, :backoff] do
-    case :gun.open(to_char_list(@endpoint), 443) do
+    case :gun.open(to_char_list(@endpoint), port) do
       {:ok, conn} ->
         receive do
           {:gun_up, ^conn, :http} ->
-            connect(:stream_start, %{state | conn: conn})
+            Logger.info "REST connection established"
+            new_state = %{state | conn: conn}
+            connect(:users, new_state)
+            connect(:flows, new_state)
         after @timeout ->
           Logger.error "Unable to connect"
 
@@ -59,13 +67,34 @@ defmodule Hedwig.Adapters.Flowdock.Connection do
     end
   end
 
-  def connect(:stream_start, %{conn: conn, query: query, token: token} = state) do
-    headers = [{"authorization", "Basic #{encoded_pw}"}, {"connection", "keep-alive"}]
+  def connect(:users, %{conn: conn, token: token, s_conn: s_conn} = state) do
     encoded_pw = Base.encode64(token)
-    ref = :gun.get(conn, to_char_list("/flows?#{query}"), headers)
+    headers = [{"authorization", "Basic #{encoded_pw}"}]
     
-    case :gun.await(conn, ref) do
-      {body, is_fin, status, _headers} ->
+    ref = :gun.get(conn, to_char_list("/users"), headers)
+    
+    case :gun.await_body(conn, ref) do
+      {:ok, body} ->
+        decoded = Poison.decode!(body)
+        send(s_conn, {:users, decoded})
+
+        {:ok, state}
+      {:error, _} = error ->
+        {:backoff, @timeout, state}
+    end
+  end
+
+  def connect(:flows, %{conn: conn, token: token, s_conn: s_conn} = state) do
+    encoded_pw = Base.encode64(token)
+    headers = [{"authorization", "Basic #{encoded_pw}"}]
+    
+    ref = :gun.get(conn, to_char_list("/flows"), headers)
+    
+    case :gun.await_body(conn, ref) do
+      {:ok, body} ->
+        decoded = Poison.decode!(body)
+        send(s_conn, {:flows, decoded})
+
         {:ok, state}
       {:error, _} = error ->
         {:backoff, @timeout, state}
@@ -108,10 +137,11 @@ defmodule Hedwig.Adapters.Flowdock.Connection do
     {:noreply, %{state | conn: conn}}
   end
 
-  def handle_info({:gun_data, conn, ref, is_fin, data}, %{owner: owner} = state) do
+  def handle_info({:gun_data, conn, ref, is_fin, data}, %{s_conn: s_conn} = state) do
     decoded = Poison.decode!(data)
+
     if decoded["event"] == "message" do
-      send(owner, {:message, decoded["content"], decoded["flow"], decoded["user"]})
+      send(s_conn, {:message, decoded["content"], decoded["flow"], decoded["user"]})
     end
 
     {:noreply, %{state | conn: conn}}
