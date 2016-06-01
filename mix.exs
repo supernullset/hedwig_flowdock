@@ -27,7 +27,6 @@ defmodule HedwigFlowdock.Mixfile do
       {:gun, "1.0.0-pre.1"},
       {:hedwig, github: "hedwig-im/hedwig"},
       {:poison, "~> 2.0"},
-      {:hackney, "~> 1.6"},
     ]
   end
 

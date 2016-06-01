@@ -39,7 +39,7 @@ defmodule Hedwig.Adapters.Flowdock do
     {:noreply, state}
   end
 
-  def handle_cast({:emote, %{text: text} = msg}, %{rest_conn: r_conn, conn: conn} = state) do
+  def handle_cast({:emote, %{text: text, user: user} = msg}, %{rest_conn: r_conn, conn: conn} = state) do
     msg = %{msg | text: "@#{user.name}: #{text}"}
 
     GenServer.cast(r_conn, {:send_message, flowdock_message(msg)})
