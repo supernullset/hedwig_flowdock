@@ -82,8 +82,6 @@ defmodule Hedwig.Adapters.Flowdock do
   end
 
   def handle_cast({:flows, flows}, %{conn: conn} = state) do
-    reduce(flows, state.flows) |> inspect |> Logger.info
-
     new_flows = reduce(flows, state.flows)
 
     {:noreply, %{state | flows: new_flows}}

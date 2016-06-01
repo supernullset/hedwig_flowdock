@@ -97,8 +97,8 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
 
   def handle_cast({:flows, flows}, %{owner: owner} = state) do
     # pull flows into filter here
-    flows = "filter=pwd-whoami/bruce-testing"
-    {:noreply, %{state | query: flows}}
+    query = "filter=#{parameterize_flows(flows)}"
+    {:noreply, %{state | query: query}}
   end
 
   def handle_info({:gun_up, conn, :http}, state) do
@@ -120,5 +120,12 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     end
 
     {:noreply, %{state | conn: conn}}
+  end
+
+  def parameterize_flows(flows) do
+    Enum.map(flows, fn d ->
+      "#{d["organization"]["parameterized_name"]}/#{d["parameterized_name"]}"
+    end)
+    |> Enum.join(",")
   end
 end
