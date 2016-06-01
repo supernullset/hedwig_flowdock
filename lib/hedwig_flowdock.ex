@@ -61,7 +61,7 @@ defmodule Hedwig.Adapters.Flowdock do
 #    {:noreply, %{flows | flows: flows}}
 #  end
 
-  def handle_info({:message, content, flow, user}, %{conn: conn, robot: robot, users: users} = state) do
+  def handle_cast({:message, content, flow, user}, %{conn: conn, robot: robot, users: users} = state) do
 
     msg = %Hedwig.Message{
       ref: make_ref(),
@@ -90,10 +90,6 @@ defmodule Hedwig.Adapters.Flowdock do
   end
 
   # TODO: update format
-  def handle_info({:groups, groups}, state) do
-    {:noreply, %{state | groups: reduce(groups, state.groups)}}
-  end
-  # TODO: update format
   def handle_info({:self, %{"id" => id, "name" => name}}, state) do
     {:noreply, %{state | id: id, name: name}}
   end
@@ -101,22 +97,27 @@ defmodule Hedwig.Adapters.Flowdock do
   def handle_cast({:users, users}, state) do
     {:noreply, %{state | users: reduce(users, state.users)}}
   end
+
   # TODO: update format
   def handle_info(%{"type" => "presence_change", "user" => user}, %{id: user} = state), do:
     {:noreply, state}
   # TODO: update format
+
   def handle_info(%{"presence" => presence, "type" => "presence_change", "user" => user}, state) do
     users = update_in(state.users, [user], &Map.put(&1, "presence", presence))
     {:noreply, %{state | users: users}}
   end
+
   # TODO: update format
   def handle_info(%{"type" => "reconnect_url"}, state), do:
     {:noreply, state}
+
   # TODO: update format
   def handle_info(:connection_ready, %{robot: robot} = state) do
     Hedwig.Robot.after_connect(robot)
     {:noreply, state}
   end
+
   # TODO: update format
   def handle_info(msg, %{robot: robot} = state) do
     Hedwig.Robot.handle_in(robot, msg)

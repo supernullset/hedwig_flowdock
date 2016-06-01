@@ -95,21 +95,10 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
   def handle_info({:gun_response, _, _, _, _, _}, state), do: {:noreply, state}
 
 
-  def handle_info({:flows, flows}, %{owner: owner} = state) do
-    GenServer.cast(owner, {:flows, flows})
+  def handle_cast({:flows, flows}, %{owner: owner} = state) do
     # pull flows into filter here
     flows = "filter=pwd-whoami/bruce-testing"
     {:noreply, %{state | query: flows}}
-  end
-
-  def handle_info({:users, users}, %{owner: owner} = state) do
-    GenServer.cast(owner, {:users, users})
-    {:noreply, state}
-  end
-
-  def handle_info({:message, content, flow, user}, %{owner: owner} = state) do
-    send(owner, {:message, content, flow, user})
-    {:noreply, state}
   end
 
   def handle_info({:gun_up, conn, :http}, state) do
@@ -127,7 +116,7 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
   def handle_info({:gun_data, conn, ref, is_fin, data}, %{owner: owner} = state) do
     decoded = Poison.decode!(data)
     if decoded["event"] == "message" do
-      send(owner, {:message, decoded["content"], decoded["flow"], decoded["user"]})
+      GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"]})
     end
 
     {:noreply, %{state | conn: conn}}

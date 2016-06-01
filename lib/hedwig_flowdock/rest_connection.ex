@@ -67,7 +67,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     end
   end
 
-  def connect(:users, %{conn: conn, token: token, s_conn: s_conn} = state) do
+  def connect(:users, %{conn: conn, token: token, owner: owner} = state) do
     encoded_pw = Base.encode64(token)
     headers = [{"authorization", "Basic #{encoded_pw}"}]
     
@@ -76,7 +76,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     case :gun.await_body(conn, ref) do
       {:ok, body} ->
         decoded = Poison.decode!(body)
-        send(s_conn, {:users, decoded})
+        GenServer.cast(owner, {:users, decoded})
 
         {:ok, state}
       {:error, _} = error ->
@@ -84,7 +84,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     end
   end
 
-  def connect(:flows, %{conn: conn, token: token, s_conn: s_conn} = state) do
+  def connect(:flows, %{conn: conn, token: token, s_conn: s_conn, owner: owner} = state) do
     encoded_pw = Base.encode64(token)
     headers = [{"authorization", "Basic #{encoded_pw}"}]
     
@@ -93,7 +93,8 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     case :gun.await_body(conn, ref) do
       {:ok, body} ->
         decoded = Poison.decode!(body)
-        send(s_conn, {:flows, decoded})
+        GenServer.cast(s_conn, {:flows, decoded})
+        GenServer.cast(owner, {:flows, decoded})
 
         {:ok, state}
       {:error, _} = error ->
@@ -137,11 +138,11 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     {:noreply, %{state | conn: conn}}
   end
 
-  def handle_info({:gun_data, conn, ref, is_fin, data}, %{s_conn: s_conn} = state) do
+  def handle_info({:gun_data, conn, ref, is_fin, data}, %{owner: owner} = state) do
     decoded = Poison.decode!(data)
 
     if decoded["event"] == "message" do
-      send(s_conn, {:message, decoded["content"], decoded["flow"], decoded["user"]})
+      GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"]})
     end
 
     {:noreply, %{state | conn: conn}}
