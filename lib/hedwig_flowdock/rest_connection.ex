@@ -44,8 +44,20 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     {:connect, :init, state}
   end
 
-  def send_message(conn, message) do
-#    ref = :gun.post(conn, to_char_list("/messages"), headers)
+  def handle_cast({:send_message, message}, %{token: token, conn: conn} = state) do
+    encoded_pw = Base.encode64(token)
+    headers = [{"authorization", "Basic #{encoded_pw}"}, {"content-type", "application/json"}]
+    {:ok, j_message} = Poison.encode(message)
+    ref = :gun.post(conn, to_char_list("/messages"), headers, j_message)
+    case :gun.await_body(conn, ref) do
+      {:ok, body} ->
+        Poison.decode!(body)
+        |> inspect
+        |> Logger.info
+      {:error, e} = error ->
+        e |> inspect |> Logger.info
+    end
+    {:noreply, state}
   end
 
   def connect(info, %{host: host, port: port} = state) when info in [:init, :backoff] do

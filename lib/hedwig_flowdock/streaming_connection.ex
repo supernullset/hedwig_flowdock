@@ -113,11 +113,20 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     {:noreply, %{state | conn: conn}}
   end
 
+  def handle_info({:gun_data, conn, ref, is_fin, "\r\n"}, state) do
+    {:noreply, %{state | conn: conn}}
+  end
+
   def handle_info({:gun_data, conn, ref, is_fin, data}, %{owner: owner} = state) do
-    decoded = Poison.decode!(data)
-    if decoded["event"] == "message" do
-      GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"]})
-    end
+    Regex.split(~r/\r\n/, data, trim: true)
+    |> Enum.map(fn m ->
+      decoded = Poison.decode!(m)
+      decoded |> inspect |> Logger.info
+      # TODO: I need a clause here to make sure im not double responding to incoming messages
+      if decoded["event"] == "message" do
+        GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"]})
+      end
+    end)
 
     {:noreply, %{state | conn: conn}}
   end
