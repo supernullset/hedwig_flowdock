@@ -12,7 +12,7 @@ defmodule HedwigFlowdock.Mixfile do
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
       package: package,
-      description: "An Flowdock adapter for Hedwig",
+      description: "A Flowdock adapter for Hedwig",
       deps: deps
     ]
   end
