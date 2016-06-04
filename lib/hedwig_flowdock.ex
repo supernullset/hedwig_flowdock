@@ -6,7 +6,6 @@ defmodule Hedwig.Adapters.Flowdock do
   alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
 
   defmodule State do
-    # FIXME: convert this to flowdock state object
     defstruct conn: nil,
       rest_conn: nil,
       flows: %{},
