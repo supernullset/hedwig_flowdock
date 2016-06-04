@@ -46,10 +46,13 @@ defmodule Hedwig.Adapters.Flowdock do
     {:noreply, state}
   end
 
-  def handle_cast({:message, content, flow_id, user}, %{conn: conn, robot: robot, users: users, flows: flows} = state) do
+  def handle_cast({:message, content, flow_id, user, thread_id}, %{conn: conn, robot: robot, users: users, flows: flows} = state) do
     msg = %Hedwig.Message{
       ref: make_ref(),
       room: flow_id,
+      private: %{
+        thread_id: thread_id
+      },
       text: content,
       type: "message",
       user: %Hedwig.User{
@@ -101,7 +104,10 @@ defmodule Hedwig.Adapters.Flowdock do
   end
 
   defp flowdock_message(%Hedwig.Message{} = msg, overrides \\ %{}) do
-    Map.merge(%{flow: msg.room, content: msg.text, event: msg.type}, overrides)
+    defaults = Map.merge(%{flow: msg.room, content: msg.text, event: msg.type}, overrides)
+    if msg.private[:thread_id] do
+      Map.merge(%{thread_id: msg.private[:thread_id]}, defaults)
+    end
   end
 
   defp reduce(collection, acc) do

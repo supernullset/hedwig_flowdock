@@ -154,7 +154,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     decoded = Poison.decode!(data)
 
     if decoded["event"] == "message" do
-      GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"]})
+      GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"], decoded["thread_id"]})
     end
 
     {:noreply, %{state | conn: conn}}
