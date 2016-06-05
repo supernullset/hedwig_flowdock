@@ -48,7 +48,6 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
       {:ok, conn} ->
         receive do
           {:gun_up, ^conn, :http} ->
-            Logger.info "Streaming connection established"
             connect(:stream_start, %{state | conn: conn})
         after @timeout ->
           Logger.error "Unable to connect"
@@ -73,7 +72,6 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     end
   end
 
-  #TODO: update
   def disconnect({:close, from}, %{conn: conn} = state) do
     :ok = :gun.close(conn)
 
@@ -121,8 +119,6 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     Regex.split(~r/\r\n/, data, trim: true)
     |> Enum.map(fn m ->
       decoded = Poison.decode!(m)
-      decoded |> inspect |> Logger.info
-      # TODO: I need a clause here to make sure im not double responding to incoming messages
       if decoded["event"] == "message" do
         GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"], decoded["thread_id"]})
       end

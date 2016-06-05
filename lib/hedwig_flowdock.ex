@@ -1,6 +1,5 @@
 defmodule Hedwig.Adapters.Flowdock do
   use Hedwig.Adapter
-  require Logger
 
   alias Hedwig.Adapters.Flowdock.StreamingConnection, as: SC
   alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
@@ -104,7 +103,7 @@ defmodule Hedwig.Adapters.Flowdock do
 
   defp flowdock_message(%Hedwig.Message{} = msg, overrides \\ %{}) do
     defaults = Map.merge(%{flow: msg.room, content: msg.text, event: msg.type}, overrides)
-    if msg.private[:thread_id] do
+    if msg.private.thread_id do
       Map.merge(%{thread_id: msg.private[:thread_id]}, defaults)
     end
   end
