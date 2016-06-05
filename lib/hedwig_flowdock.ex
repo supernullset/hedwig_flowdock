@@ -70,25 +70,8 @@ defmodule Hedwig.Adapters.Flowdock do
 
     {:noreply, %{state | flows: new_flows}}
   end
-
-  # TODO: update format
-  def handle_info({:self, %{"id" => id, "name" => name}}, state) do
-    {:noreply, %{state | id: id, name: name}}
-  end
-
   def handle_cast({:users, users}, state) do
     {:noreply, %{state | users: reduce(users, state.users)}}
-  end
-
-  # TODO: update format
-  def handle_info(%{"type" => "presence_change", "user" => user}, %{id: user} = state) do
-    {:noreply, state}
-  end
-
-  # TODO: update format
-  def handle_info(%{"presence" => presence, "type" => "presence_change", "user" => user}, state) do
-    users = update_in(state.users, [user], &Map.put(&1, "presence", presence))
-    {:noreply, %{state | users: users}}
   end
 
   def handle_info(:connection_ready, %{robot: robot} = state) do
