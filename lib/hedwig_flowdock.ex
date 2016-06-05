@@ -22,7 +22,7 @@ defmodule Hedwig.Adapters.Flowdock do
     {:ok, %State{conn: s_conn, rest_conn: r_conn, opts: opts, robot: robot}}
   end
 
-  def handle_cast({:send, msg}, %{rest_conn: r_conn} = state) do
+  def handle_cast({:send, msg}, %{rest_conn: r_conn} = _state) do
     GenServer.cast(r_conn, {:send_message, flowdock_message(msg)})
   end
 
@@ -30,21 +30,21 @@ defmodule Hedwig.Adapters.Flowdock do
     {:noreply, %{state | rest_conn: r_conn}}
   end
 
-  def handle_cast({:reply, %{user: user, text: text} = msg}, %{rest_conn: r_conn, users: users} = state) do
+  def handle_cast({:reply, %{user: user, text: text} = msg}, %{rest_conn: r_conn} = state) do
     msg = %{msg | text: "@#{user.name}: #{text}"}
 
     GenServer.cast(r_conn, {:send_message, flowdock_message(msg)})
     {:noreply, state}
   end
 
-  def handle_cast({:emote, %{text: text, user: user} = msg}, %{rest_conn: r_conn, conn: conn} = state) do
+  def handle_cast({:emote, %{text: text, user: user} = msg}, %{rest_conn: r_conn} = state) do
     msg = %{msg | text: "@#{user.name}: #{text}"}
 
     GenServer.cast(r_conn, {:send_message, flowdock_message(msg)})
     {:noreply, state}
   end
 
-  def handle_cast({:message, content, flow_id, user, thread_id}, %{conn: conn, robot: robot, users: users, flows: flows} = state) do
+  def handle_cast({:message, content, flow_id, user, thread_id}, %{robot: robot, users: users} = state) do
     msg = %Hedwig.Message{
       ref: make_ref(),
       room: flow_id,
@@ -65,7 +65,7 @@ defmodule Hedwig.Adapters.Flowdock do
     {:noreply, state}
   end
 
-  def handle_cast({:flows, flows}, %{conn: conn} = state) do
+  def handle_cast({:flows, flows}, state) do
     new_flows = reduce(flows, state.flows)
 
     {:noreply, %{state | flows: new_flows}}
