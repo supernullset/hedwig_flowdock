@@ -32,7 +32,7 @@ defmodule HedwigFlowdock.Mixfile do
 
   defp package do
     [
-      files: ["lib", "priv", "mix.exs", "README*", "readme*", "LICENSE*", "license*"],
+      files: ["lib", "mix.exs", "README*", "LICENSE*"],
       maintainers: ["Sean Williamson"],
       licenses: ["MIT"],
       links: %{
