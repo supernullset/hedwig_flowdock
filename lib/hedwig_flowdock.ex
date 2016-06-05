@@ -1,12 +1,10 @@
 defmodule Hedwig.Adapters.Flowdock do
   use Hedwig.Adapter
-  require Logger
 
   alias Hedwig.Adapters.Flowdock.StreamingConnection, as: SC
   alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
 
   defmodule State do
-    # FIXME: convert this to flowdock state object
     defstruct conn: nil,
       rest_conn: nil,
       flows: %{},
@@ -46,10 +44,13 @@ defmodule Hedwig.Adapters.Flowdock do
     {:noreply, state}
   end
 
-  def handle_cast({:message, content, flow_id, user}, %{conn: conn, robot: robot, users: users, flows: flows} = state) do
+  def handle_cast({:message, content, flow_id, user, thread_id}, %{conn: conn, robot: robot, users: users, flows: flows} = state) do
     msg = %Hedwig.Message{
       ref: make_ref(),
       room: flow_id,
+      private: %{
+        thread_id: thread_id
+      },
       text: content,
       type: "message",
       user: %Hedwig.User{
@@ -69,25 +70,8 @@ defmodule Hedwig.Adapters.Flowdock do
 
     {:noreply, %{state | flows: new_flows}}
   end
-
-  # TODO: update format
-  def handle_info({:self, %{"id" => id, "name" => name}}, state) do
-    {:noreply, %{state | id: id, name: name}}
-  end
-
   def handle_cast({:users, users}, state) do
     {:noreply, %{state | users: reduce(users, state.users)}}
-  end
-
-  # TODO: update format
-  def handle_info(%{"type" => "presence_change", "user" => user}, %{id: user} = state) do
-    {:noreply, state}
-  end
-
-  # TODO: update format
-  def handle_info(%{"presence" => presence, "type" => "presence_change", "user" => user}, state) do
-    users = update_in(state.users, [user], &Map.put(&1, "presence", presence))
-    {:noreply, %{state | users: users}}
   end
 
   def handle_info(:connection_ready, %{robot: robot} = state) do
@@ -101,7 +85,10 @@ defmodule Hedwig.Adapters.Flowdock do
   end
 
   defp flowdock_message(%Hedwig.Message{} = msg, overrides \\ %{}) do
-    Map.merge(%{flow: msg.room, content: msg.text, event: msg.type}, overrides)
+    defaults = Map.merge(%{flow: msg.room, content: msg.text, event: msg.type}, overrides)
+    if msg.private.thread_id do
+      Map.merge(%{thread_id: msg.private[:thread_id]}, defaults)
+    end
   end
 
   defp reduce(collection, acc) do

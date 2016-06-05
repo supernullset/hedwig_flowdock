@@ -49,14 +49,6 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     headers = [{"authorization", "Basic #{encoded_pw}"}, {"content-type", "application/json"}]
     {:ok, j_message} = Poison.encode(message)
     ref = :gun.post(conn, to_char_list("/messages"), headers, j_message)
-    case :gun.await_body(conn, ref) do
-      {:ok, body} ->
-        Poison.decode!(body)
-        |> inspect
-        |> Logger.info
-      {:error, e} = error ->
-        e |> inspect |> Logger.info
-    end
     {:noreply, state}
   end
 
@@ -65,7 +57,6 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
       {:ok, conn} ->
         receive do
           {:gun_up, ^conn, :http} ->
-            Logger.info "REST connection established"
             new_state = %{state | conn: conn}
             connect(:users, new_state)
             connect(:flows, new_state)
@@ -114,7 +105,6 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     end
   end
 
-  #TODO: update
   def disconnect({:close, from}, %{conn: conn} = state) do
     :ok = :gun.close(conn)
 
@@ -141,8 +131,6 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
   end
 
   def handle_info({:gun_down, _conn, :http, _reason, _, _} = msg, state) do
-    msg |> inspect |> Logger.info
-
     {:disconnect, :reconnect, state}
   end
 
@@ -154,7 +142,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     decoded = Poison.decode!(data)
 
     if decoded["event"] == "message" do
-      GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"]})
+      GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"], decoded["thread_id"]})
     end
 
     {:noreply, %{state | conn: conn}}
