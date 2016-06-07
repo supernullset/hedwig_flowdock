@@ -100,10 +100,10 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
   def handle_info({:gun_response, _, _, _, _, _}, state), do: {:noreply, state}
 
 
-  def handle_cast({:flows, flows}, %{owner: owner} = state) do
+  def handle_call({:flows, flows}, _from, %{owner: owner} = state) do
     # pull flows into filter here
     query = "filter=#{parameterize_flows(flows)}"
-    {:noreply, %{state | query: query}}
+    {:reply, {}, %{state | query: query}}
   end
 
   def handle_info({:gun_up, conn, :http}, state) do

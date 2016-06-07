@@ -79,7 +79,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     case :gun.await_body(conn, ref) do
       {:ok, body} ->
         decoded = Poison.decode!(body)
-        GenServer.cast(owner, {:users, decoded})
+        GenServer.call(owner, {:users, decoded})
 
         {:ok, state}
       {:error, _} = error ->
@@ -96,9 +96,8 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     case :gun.await_body(conn, ref) do
       {:ok, body} ->
         decoded = Poison.decode!(body)
-        GenServer.cast(s_conn, {:flows, decoded})
-        GenServer.cast(owner, {:flows, decoded})
-
+        GenServer.call(s_conn, {:flows, decoded})
+        GenServer.call(owner, {:flows, decoded})
         {:ok, state}
       {:error, _} = error ->
         {:backoff, @timeout, state}
