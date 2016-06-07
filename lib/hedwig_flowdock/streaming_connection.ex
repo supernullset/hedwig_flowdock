@@ -7,13 +7,15 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
   @endpoint "stream.flowdock.com"
 
   defstruct conn: nil,
-            host: nil,
-            path: nil,
-            port: nil,
-            ref: nil,
-            token: nil,
-            query: nil,
-            owner: nil
+    host: nil,
+    path: nil,
+    port: nil,
+    ref: nil,
+    token: nil,
+    username: nil,
+    password: nil,
+    query: nil,
+    owner: nil
 
   ### PUBLIC API ###
 
@@ -59,8 +61,13 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     end
   end
 
-  def connect(:stream_start, %{conn: conn, query: query, token: token} = state) do
-    encoded_pw = Base.encode64(token)
+  def connect(:stream_start, %{conn: conn, query: query, token: token, password: password, username: username} = state) do
+    auth_string = if (password && username) do
+      "#{password}:#{username}"
+    else
+      token
+    end
+    encoded_pw = Base.encode64(auth_string)
     headers = [{"authorization", "Basic #{encoded_pw}"}, {"connection", "keep-alive"}]
     ref = :gun.get(conn, to_char_list("/flows?#{query}"), headers)
 
