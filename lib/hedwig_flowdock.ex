@@ -82,6 +82,10 @@ defmodule Hedwig.Adapters.Flowdock do
     {:reply, nil, new_state}
   end
 
+  def handle_call({:robot_name}, _from, %{opts: opts} = state) do
+    {:reply, opts[:name], state}
+  end
+
   def handle_info(:connection_ready, %{robot: robot} = state) do
     Hedwig.Robot.after_connect(robot)
     {:noreply, state}
