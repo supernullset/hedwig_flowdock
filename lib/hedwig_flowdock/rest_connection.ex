@@ -4,6 +4,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
   require Logger
 
   @timeout 5_000
+  @ssl_port 443
   @endpoint "api.flowdock.com"
 
   defstruct conn: nil,
@@ -20,13 +21,13 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
   ### PUBLIC API ###
 
   def start_link(opts) do
-    %URI{host: host, port: port, path: path} =
+    %URI{host: host, path: path} =
       URI.parse(opts[:endpoint] || @endpoint)
 
     opts =
       opts
       |> Keyword.put(:host, host)
-      |> Keyword.put(:port, 443)
+      |> Keyword.put(:port, @ssl_port)
       |> Keyword.put(:path, path)
       |> Keyword.put(:owner, self())
 

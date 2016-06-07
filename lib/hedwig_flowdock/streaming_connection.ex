@@ -4,6 +4,7 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
   require Logger
 
   @timeout 5_000
+  @ssl_port 443
   @endpoint "stream.flowdock.com"
 
   defstruct conn: nil,
@@ -21,13 +22,13 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
   ### PUBLIC API ###
 
   def start_link(opts) do
-    %URI{host: host, port: port, path: path} =
+    %URI{host: host, path: path} =
       URI.parse(opts[:endpoint] || @endpoint)
 
     opts =
       opts
       |> Keyword.put(:host, host)
-      |> Keyword.put(:port, 443)
+      |> Keyword.put(:port, @ssl_port)
       |> Keyword.put(:path, path)
       |> Keyword.put(:owner, self())
       |> Keyword.put(:query, "filter=#{parameterize_flows(opts[:flows])}&active=true&user=1")
@@ -43,11 +44,11 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
 
   ### Connection callbacks ###
 
-  def init(%{token: token, owner: owner} = state) do
+  def init(state) do
     {:connect, :init, state}
   end
 
-  def connect(info, %{host: host, port: port} = state) when info in [:init, :backoff] do
+  def connect(info, %{port: port} = state) when info in [:init, :backoff] do
     case :gun.open(to_char_list(@endpoint), port) do
       {:ok, conn} ->
         receive do
@@ -59,6 +60,7 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
           {:backoff, @timeout, state}
         end
       {:error, _} = error ->
+        Logger.error inspect(error)
         {:backoff, @timeout, state}
     end
   end
@@ -74,14 +76,15 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     ref = :gun.get(conn, to_char_list("/flows?#{query}"), headers)
 
     case :gun.await(conn, ref) do
-      {body, is_fin, status, _headers} ->
+      {_body, _is_fin, _status, _headers} ->
         {:ok, state}
       {:error, _} = error ->
+        Logger.error inspect(error)
         {:backoff, @timeout, state}
     end
   end
 
-  def disconnect({:close, from}, %{conn: conn} = state) do
+  def disconnect({:close, _from}, %{conn: conn} = state) do
     :ok = :gun.close(conn)
 
     {:stop, :normal, %{state | conn: nil,
@@ -105,19 +108,19 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     {:noreply, %{state | conn: conn}}
   end
 
-  def handle_info({:gun_down, _conn, :http, _reason, _, _} = msg, state) do
+  def handle_info({:gun_down, _conn, :http, _reason, _, _} = _msg, state) do
     {:disconnect, :reconnect, state}
   end
 
-  def handle_info({:gun_data, conn, ref, is_fin, "\n"}, state) do
+  def handle_info({:gun_data, conn, _ref, _is_fin, "\n"}, state) do
     {:noreply, %{state | conn: conn}}
   end
 
-  def handle_info({:gun_data, conn, ref, is_fin, "\r\n"}, state) do
+  def handle_info({:gun_data, conn, _ref, _is_fin, "\r\n"}, state) do
     {:noreply, %{state | conn: conn}}
   end
 
-  def handle_info({:gun_data, conn, ref, is_fin, data}, %{owner: owner} = state) do
+  def handle_info({:gun_data, conn, _ref, _is_fin, data}, %{owner: owner} = state) do
     Regex.split(~r/\r\n/, data, trim: true)
     |> Enum.map(fn m ->
       decoded = Poison.decode!(m)
