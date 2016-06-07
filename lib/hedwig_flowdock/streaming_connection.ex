@@ -102,7 +102,7 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
 
   def handle_call({:flows, flows}, _from, %{owner: owner} = state) do
     # pull flows into filter here
-    query = "filter=#{parameterize_flows(flows)}"
+    query = "filter=#{parameterize_flows(flows)}&active=true&user=1"
     {:reply, {}, %{state | query: query}}
   end
 
