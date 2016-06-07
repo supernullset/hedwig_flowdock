@@ -24,8 +24,16 @@ defmodule Hedwig.Adapters.Flowdock do
     {:ok, %State{conn: s_conn, rest_conn: r_conn, opts: opts, robot: robot}}
   end
 
-  def handle_cast({:send, msg}, %{rest_conn: r_conn} = _state) do
+  def handle_cast({:send, msg}, %{rest_conn: r_conn} = state) do
     GenServer.cast(r_conn, {:send_message, flowdock_message(msg)})
+
+    {:noreply, state}
+  end
+
+  def handle_cast({:send_raw, msg}, %{rest_conn: r_conn} = state) do
+    GenServer.cast(r_conn, {:send_message, msg})
+
+    {:noreply, state}
   end
 
   def handle_cast({:reply, %{user: user, text: text} = msg}, %{rest_conn: r_conn} = state) do
