@@ -17,11 +17,17 @@ defmodule Hedwig.Adapters.Flowdock do
   end
 
   def init({robot, opts}) do
-    opts |> inspect |> Logger.info
-    {:ok, s_conn} = SC.start_link(opts)
-    {:ok, r_conn} = RC.start_link(Keyword.put(opts, :s_conn, s_conn))
+    Logger.info "#{opts[:name]} is Booting up..."
 
-    {:ok, %State{conn: s_conn, rest_conn: r_conn, opts: opts, robot: robot}}
+    {:ok, r_conn} = RC.start_link(opts)
+    flows = GenServer.call(r_conn, :flows)
+
+    {:ok, s_conn} = SC.start_link(Keyword.put(opts, :flows, flows))
+    users = GenServer.call(r_conn, :users)
+    reduced_users = reduce(users, %{})
+    user = Enum.find(users, fn u -> u["nick"] == opts[:name] end)
+
+    {:ok, %State{conn: s_conn, rest_conn: r_conn, opts: opts, robot: robot, users: reduced_users, user_id: user["id"]}}
   end
 
   def handle_cast({:send, msg}, %{rest_conn: r_conn} = state) do
@@ -73,21 +79,6 @@ defmodule Hedwig.Adapters.Flowdock do
 
   def handle_call({:flows, flows}, _from, state) do
     {:reply, nil, %{state | flows: flows}}
-  end
-
-  def handle_call({:users, users}, _from, state) do
-    reduced_users = reduce(users, state.users)
-    user = Enum.find(users, fn u -> u["nick"] == state.opts[:name] end)
-    new_state = %{state | users: reduced_users, user_id: user["id"]}
-
-# TODO: fix it so that r_conn is present eg, move the state 100% onto rest connection
-#    state.flows
-#    |> Enum.each(fn (f) ->
-#      msg = %{flow: parameterize_flow(f), content: "", event: "activity.user", user: user["id"]}
-#      GenServer.cast(state.r_conn, {:send_message, msg})
-#    end)
-
-    {:reply, nil, new_state}
   end
 
   def handle_call({:robot_name}, _from, %{opts: opts} = state) do

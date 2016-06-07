@@ -7,7 +7,6 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
   @endpoint "api.flowdock.com"
 
   defstruct conn: nil,
-            s_conn: nil,
             host: nil,
             path: nil,
             port: nil,
@@ -61,8 +60,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
           {:gun_up, ^conn, :http} ->
             new_state = %{state | conn: conn}
             {:ok, new_state} = connect(:flows, new_state)
-            {:ok, new_state} = connect(:users, new_state)
-            activity(new_state)
+            connect(:users, new_state)
         after @timeout ->
           Logger.error "Unable to connect"
 
@@ -88,7 +86,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     end
   end
 
-  def connect(:flows, %{conn: conn, token: token, s_conn: s_conn, owner: owner} = state) do
+  def connect(:flows, %{conn: conn, token: token, owner: owner} = state) do
     encoded_pw = Base.encode64(token)
     headers = [{"authorization", "Basic #{encoded_pw}"}]
     
@@ -137,6 +135,14 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
 
     {:connect, :init, %{state | conn: nil,
                                 ref: nil}}
+  end
+
+  def handle_call(:flows, _from , %{flows: flows} = state) do
+    {:reply, flows, state}
+  end
+
+  def handle_call(:users, _from , %{users: users} = state) do
+    {:reply, users, state}
   end
 
   def handle_call(:close, from, state) do

@@ -15,7 +15,8 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     username: nil,
     password: nil,
     query: nil,
-    owner: nil
+    owner: nil,
+    flows: nil
 
   ### PUBLIC API ###
 
@@ -29,6 +30,7 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
       |> Keyword.put(:port, 443)
       |> Keyword.put(:path, path)
       |> Keyword.put(:owner, self())
+      |> Keyword.put(:query, "filter=#{parameterize_flows(opts[:flows])}&active=true&user=1")
 
     initial_state = struct(__MODULE__, opts)
 
@@ -98,13 +100,6 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
   end
 
   def handle_info({:gun_response, _, _, _, _, _}, state), do: {:noreply, state}
-
-
-  def handle_call({:flows, flows}, _from, %{owner: owner} = state) do
-    # pull flows into filter here
-    query = "filter=#{parameterize_flows(flows)}&active=true&user=1"
-    {:reply, {}, %{state | query: query}}
-  end
 
   def handle_info({:gun_up, conn, :http}, state) do
     {:noreply, %{state | conn: conn}}
