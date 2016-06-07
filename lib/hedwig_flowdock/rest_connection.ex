@@ -4,28 +4,30 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
   require Logger
 
   @timeout 5_000
+  @ssl_port 443
   @endpoint "api.flowdock.com"
 
   defstruct conn: nil,
-            s_conn: nil,
             host: nil,
             path: nil,
             port: nil,
             ref: nil,
             token: nil,
             query: nil,
-            owner: nil
+            owner: nil,
+            users: nil,
+            flows: nil
 
   ### PUBLIC API ###
 
   def start_link(opts) do
-    %URI{host: host, port: port, path: path} =
+    %URI{host: host, path: path} =
       URI.parse(opts[:endpoint] || @endpoint)
 
     opts =
       opts
       |> Keyword.put(:host, host)
-      |> Keyword.put(:port, 443)
+      |> Keyword.put(:port, @ssl_port)
       |> Keyword.put(:path, path)
       |> Keyword.put(:owner, self())
 
@@ -58,8 +60,8 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
         receive do
           {:gun_up, ^conn, :http} ->
             new_state = %{state | conn: conn}
+            {:ok, new_state} = connect(:flows, new_state)
             connect(:users, new_state)
-            connect(:flows, new_state)
         after @timeout ->
           Logger.error "Unable to connect"
 
@@ -79,15 +81,13 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     case :gun.await_body(conn, ref) do
       {:ok, body} ->
         decoded = Poison.decode!(body)
-        GenServer.cast(owner, {:users, decoded})
-
-        {:ok, state}
+        {:ok, %{state | users: decoded}}
       {:error, _} = error ->
         {:backoff, @timeout, state}
     end
   end
 
-  def connect(:flows, %{conn: conn, token: token, s_conn: s_conn, owner: owner} = state) do
+  def connect(:flows, %{conn: conn, token: token, owner: owner} = state) do
     encoded_pw = Base.encode64(token)
     headers = [{"authorization", "Basic #{encoded_pw}"}]
     
@@ -96,13 +96,32 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     case :gun.await_body(conn, ref) do
       {:ok, body} ->
         decoded = Poison.decode!(body)
-        GenServer.cast(s_conn, {:flows, decoded})
-        GenServer.cast(owner, {:flows, decoded})
 
-        {:ok, state}
+        {:ok, %{ state | flows: decoded}}
       {:error, _} = error ->
         {:backoff, @timeout, state}
     end
+  end
+
+  def activity(%{users: users, owner: owner, flows: flows} = state) do
+    robot_name = GenServer.call(owner, {:robot_name})
+    user = Enum.find(users, fn u -> u["nick"] == robot_name end)
+
+    user |> inspect |> Logger.info
+    {mega, secs, _} = :erlang.now()
+    last_activity = mega*1000000 + secs
+
+    flows
+    |> Enum.each(fn (f) ->
+      msg = %{flow: parameterize_flow(f), content: %{last_activity: last_activity}, event: "activity.user", user: user["id"]}
+      GenServer.cast(owner, {:send_raw, msg})
+    end)
+
+    {:ok, state}
+  end
+
+  def parameterize_flow(flow) do
+    "#{flow["organization"]["parameterized_name"]}/#{flow["parameterized_name"]}"
   end
 
   def disconnect({:close, from}, %{conn: conn} = state) do
@@ -117,6 +136,14 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
 
     {:connect, :init, %{state | conn: nil,
                                 ref: nil}}
+  end
+
+  def handle_call(:flows, _from , %{flows: flows} = state) do
+    {:reply, flows, state}
+  end
+
+  def handle_call(:users, _from , %{users: users} = state) do
+    {:reply, users, state}
   end
 
   def handle_call(:close, from, state) do

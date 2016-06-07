@@ -1,6 +1,7 @@
 defmodule Hedwig.Adapters.Flowdock do
   use Hedwig.Adapter
 
+  require Logger
   alias Hedwig.Adapters.Flowdock.StreamingConnection, as: SC
   alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
 
@@ -16,18 +17,29 @@ defmodule Hedwig.Adapters.Flowdock do
   end
 
   def init({robot, opts}) do
-    {:ok, s_conn} = SC.start_link(opts)
-    {:ok, r_conn} = RC.start_link(Keyword.put(opts, :s_conn, s_conn))
+    Logger.info "#{opts[:name]} is Booting up..."
 
-    {:ok, %State{conn: s_conn, rest_conn: r_conn, opts: opts, robot: robot}}
+    {:ok, r_conn} = RC.start_link(opts)
+    flows = GenServer.call(r_conn, :flows)
+
+    {:ok, s_conn} = SC.start_link(Keyword.put(opts, :flows, flows))
+    users = GenServer.call(r_conn, :users)
+    reduced_users = reduce(users, %{})
+    user = Enum.find(users, fn u -> u["nick"] == opts[:name] end)
+
+    {:ok, %State{conn: s_conn, rest_conn: r_conn, opts: opts, robot: robot, users: reduced_users, user_id: user["id"]}}
   end
 
-  def handle_cast({:send, msg}, %{rest_conn: r_conn} = _state) do
+  def handle_cast({:send, msg}, %{rest_conn: r_conn} = state) do
     GenServer.cast(r_conn, {:send_message, flowdock_message(msg)})
+
+    {:noreply, state}
   end
 
-  def handle_cast({:assign_rest_conn, r_conn}, state) do
-    {:noreply, %{state | rest_conn: r_conn}}
+  def handle_cast({:send_raw, msg}, %{rest_conn: r_conn} = state) do
+    GenServer.cast(r_conn, {:send_message, msg})
+
+    {:noreply, state}
   end
 
   def handle_cast({:reply, %{user: user, text: text} = msg}, %{rest_conn: r_conn} = state) do
@@ -65,13 +77,12 @@ defmodule Hedwig.Adapters.Flowdock do
     {:noreply, state}
   end
 
-  def handle_cast({:flows, flows}, state) do
-    new_flows = reduce(flows, state.flows)
-
-    {:noreply, %{state | flows: new_flows}}
+  def handle_call({:flows, flows}, _from, state) do
+    {:reply, nil, %{state | flows: flows}}
   end
-  def handle_cast({:users, users}, state) do
-    {:noreply, %{state | users: reduce(users, state.users)}}
+
+  def handle_call({:robot_name}, _from, %{opts: opts} = state) do
+    {:reply, opts[:name], state}
   end
 
   def handle_info(:connection_ready, %{robot: robot} = state) do
