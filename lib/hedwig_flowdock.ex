@@ -1,6 +1,7 @@
 defmodule Hedwig.Adapters.Flowdock do
   use Hedwig.Adapter
 
+  require Logger
   alias Hedwig.Adapters.Flowdock.StreamingConnection, as: SC
   alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
 
@@ -16,6 +17,7 @@ defmodule Hedwig.Adapters.Flowdock do
   end
 
   def init({robot, opts}) do
+    opts |> inspect |> Logger.info
     {:ok, s_conn} = SC.start_link(opts)
     {:ok, r_conn} = RC.start_link(Keyword.put(opts, :s_conn, s_conn))
 
@@ -62,13 +64,22 @@ defmodule Hedwig.Adapters.Flowdock do
   end
 
   def handle_call({:flows, flows}, _from, state) do
-    new_flows = reduce(flows, state.flows)
-
-    {:reply, nil, %{state | flows: new_flows}}
+    {:reply, nil, %{state | flows: flows}}
   end
 
   def handle_call({:users, users}, _from, state) do
-    {:reply, nil, %{state | users: reduce(users, state.users)}}
+    reduced_users = reduce(users, state.users)
+    user = Enum.find(users, fn u -> u["nick"] == state.opts[:name] end)
+    new_state = %{state | users: reduced_users, user_id: user["id"]}
+
+# TODO: fix it so that r_conn is present eg, move the state 100% onto rest connection
+#    state.flows
+#    |> Enum.each(fn (f) ->
+#      msg = %{flow: parameterize_flow(f), content: "", event: "activity.user", user: user["id"]}
+#      GenServer.cast(state.r_conn, {:send_message, msg})
+#    end)
+
+    {:reply, nil, new_state}
   end
 
   def handle_info(:connection_ready, %{robot: robot} = state) do

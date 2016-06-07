@@ -58,8 +58,8 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
         receive do
           {:gun_up, ^conn, :http} ->
             new_state = %{state | conn: conn}
-            connect(:users, new_state)
             connect(:flows, new_state)
+            connect(:users, new_state)
         after @timeout ->
           Logger.error "Unable to connect"
 
