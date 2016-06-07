@@ -14,7 +14,9 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
             ref: nil,
             token: nil,
             query: nil,
-            owner: nil
+            owner: nil,
+            users: nil,
+            flows: nil
 
   ### PUBLIC API ###
 
@@ -58,8 +60,9 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
         receive do
           {:gun_up, ^conn, :http} ->
             new_state = %{state | conn: conn}
-            connect(:flows, new_state)
-            connect(:users, new_state)
+            {:ok, new_state} = connect(:flows, new_state)
+            {:ok, new_state} = connect(:users, new_state)
+            activity(new_state)
         after @timeout ->
           Logger.error "Unable to connect"
 
@@ -79,9 +82,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     case :gun.await_body(conn, ref) do
       {:ok, body} ->
         decoded = Poison.decode!(body)
-        GenServer.call(owner, {:users, decoded})
-
-        {:ok, state}
+        {:ok, %{state | users: decoded}}
       {:error, _} = error ->
         {:backoff, @timeout, state}
     end
@@ -96,12 +97,32 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     case :gun.await_body(conn, ref) do
       {:ok, body} ->
         decoded = Poison.decode!(body)
-        GenServer.call(s_conn, {:flows, decoded})
-        GenServer.call(owner, {:flows, decoded})
-        {:ok, state}
+
+        {:ok, %{ state | flows: decoded}}
       {:error, _} = error ->
         {:backoff, @timeout, state}
     end
+  end
+
+  def activity(%{users: users, owner: owner, flows: flows} = state) do
+    robot_name = GenServer.call(owner, {:robot_name})
+    user = Enum.find(users, fn u -> u["nick"] == robot_name end)
+
+    user |> inspect |> Logger.info
+    {mega, secs, _} = :erlang.now()
+    last_activity = mega*1000000 + secs
+
+    flows
+    |> Enum.each(fn (f) ->
+      msg = %{flow: parameterize_flow(f), content: %{last_activity: last_activity}, event: "activity.user", user: user["id"]}
+      GenServer.cast(owner, {:send_raw, msg})
+    end)
+
+    {:ok, state}
+  end
+
+  def parameterize_flow(flow) do
+    "#{flow["organization"]["parameterized_name"]}/#{flow["parameterized_name"]}"
   end
 
   def disconnect({:close, from}, %{conn: conn} = state) do
