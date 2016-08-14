@@ -53,6 +53,7 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
       {:ok, conn} ->
         receive do
           {:gun_up, ^conn, :http} ->
+            Logger.info "Streaming connection established"
             connect(:stream_start, %{state | conn: conn})
         after @timeout ->
           Logger.error "Unable to connect"

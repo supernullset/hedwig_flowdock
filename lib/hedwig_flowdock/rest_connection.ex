@@ -59,6 +59,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
       {:ok, conn} ->
         receive do
           {:gun_up, ^conn, :http} ->
+            Logger.info "REST connection established"
             new_state = %{state | conn: conn}
             {:ok, new_state} = connect(:flows, new_state)
             connect(:users, new_state)
@@ -67,7 +68,8 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
 
           {:backoff, @timeout, state}
         end
-      {:error, _} = _error ->
+      {:error, e} = _error ->
+        Logger.error inspect(e)
         {:backoff, @timeout, state}
     end
   end
