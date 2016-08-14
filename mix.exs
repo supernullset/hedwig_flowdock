@@ -1,7 +1,7 @@
 defmodule HedwigFlowdock.Mixfile do
   use Mix.Project
 
-  @version "0.1.1"
+  @version "0.1.2"
 
   def project do
     [
@@ -27,6 +27,7 @@ defmodule HedwigFlowdock.Mixfile do
       {:gun, "1.0.0-pre.1"},
       {:hedwig, github: "hedwig-im/hedwig"},
       {:poison, "~> 2.0"},
+      {:ex_doc, ">= 0.0.0", only: :dev}
     ]
   end
 
