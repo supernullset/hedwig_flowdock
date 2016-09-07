@@ -39,16 +39,16 @@ Add `hedwig_flowdock` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [{:hedwig_flowdock, "0.1"}]
-  end
-  ```
+end
+```
 
 Ensure `hedwig_flowdock` is started before your application:
 
 ```elixir
 def application do
   [applications: [:hedwig_flowdock]]
-  end
-  ```
+end
+```
 
 ### Generate our robot
 
@@ -76,8 +76,8 @@ Please select an adapter: 1
 Don't forget to add your new robot to your supervision tree
 (typically in lib/alfred.ex):
 
-    worker(Alfred.Robot, [])
-    ```
+worker(Alfred.Robot, [])
+```
 
 ### Supervise our robot
 
