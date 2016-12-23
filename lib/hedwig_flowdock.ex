@@ -71,6 +71,9 @@ defmodule Hedwig.Adapters.Flowdock do
       }
     }
 
+    Logger.info "Received message via cast: #{msg.text}"
+    Logger.info "Robot: #{inspect(robot)}"
+
     if msg.text do
       Hedwig.Robot.handle_in(robot, msg)
     end
