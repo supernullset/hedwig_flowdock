@@ -63,6 +63,7 @@ defmodule Hedwig.Adapters.Flowdock do
       private: %{
         thread_id: thread_id
       },
+      robot: robot,
       text: content,
       type: "message",
       user: %Hedwig.User{
