@@ -27,6 +27,8 @@ defmodule Hedwig.Adapters.Flowdock do
     reduced_users = reduce(users, %{})
     user = Enum.find(users, fn u -> u["nick"] == opts[:name] end)
 
+    Kernel.send(self(), :connection_ready)
+
     {:ok, %State{conn: s_conn, rest_conn: r_conn, opts: opts, robot: robot, users: reduced_users, user_id: user["id"]}}
   end
 
