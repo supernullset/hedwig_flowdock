@@ -25,7 +25,7 @@ defmodule HedwigFlowdock.Mixfile do
     [
       {:connection, "~> 1.0"},
       {:gun, "1.0.0-pre.1"},
-      {:hedwig, github: "hedwig-im/hedwig"},
+      {:hedwig, "~> 1.0"},
       {:poison, "~> 2.0"},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
