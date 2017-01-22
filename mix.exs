@@ -11,9 +11,9 @@ defmodule HedwigFlowdock.Mixfile do
       elixir: "~> 1.2",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
-      package: package,
+      package: package(),
       description: "A Flowdock adapter for Hedwig",
-      deps: deps
+      deps: deps()
     ]
   end
 
