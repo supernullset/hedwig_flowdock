@@ -25,17 +25,26 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     %URI{host: host, path: path} =
       URI.parse(opts[:endpoint] || @endpoint)
 
+    [{r_conn, _}] = Registry.lookup(FlowdockConnectionRegistry, :rest_connection)
+    flows = GenServer.call(r_conn, :flows)
     opts =
       opts
       |> Keyword.put(:host, host)
       |> Keyword.put(:port, @ssl_port)
       |> Keyword.put(:path, path)
       |> Keyword.put(:owner, self())
+      |> Keyword.put(:flows, flows)
+
+    opts = opts
       |> Keyword.put(:query, "filter=#{parameterize_flows(opts[:flows])}&active=true&user=1")
 
     initial_state = struct(__MODULE__, opts)
 
-    Connection.start_link(__MODULE__, initial_state)
+    Connection.start_link(__MODULE__, initial_state, name: streaming_name())
+  end
+
+  def streaming_name do
+    {:via, Registry, {FlowdockConnectionRegistry, :streaming_connection}}
   end
 
   def close(pid) do

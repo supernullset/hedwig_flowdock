@@ -33,7 +33,11 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
 
     initial_state = struct(__MODULE__, opts)
 
-    Connection.start_link(__MODULE__, initial_state)
+    Connection.start_link(__MODULE__, initial_state, name: name())
+  end
+
+  def name do
+    {:via, Registry, {FlowdockConnectionRegistry, :rest_connection}}
   end
 
   def close(pid) do
@@ -44,6 +48,19 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
 
   def init(state) do
     {:connect, :init, state}
+  end
+
+  def users do
+    GenServer.call(pid(), :users)
+  end
+
+  def pid do
+    [{pid, _}] = Registry.lookup(FlowdockConnectionRegistry, :rest_connection)
+    pid
+  end
+
+  def send_message(content) do
+    GenServer.cast(pid(), {:send_message, content})
   end
 
   def handle_cast({:send_message, message}, %{token: token, conn: conn} = state) do

@@ -2,6 +2,7 @@ defmodule Hedwig.Adapters.Flowdock do
   use Hedwig.Adapter
 
   require Logger
+  alias Hedwig.Adapters.Flowdock.ConnectionSupervisor, as: CS
   alias Hedwig.Adapters.Flowdock.StreamingConnection, as: SC
   alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
 
@@ -17,23 +18,32 @@ defmodule Hedwig.Adapters.Flowdock do
   end
 
   def init({robot, opts}) do
-    Logger.info "#{opts[:name]} is Booting up..."
+    Logger.info "Booting up..."
+    {:ok, _} = Registry.start_link(:unique, FlowdockConnectionRegistry)
 
-    {:ok, r_conn} = RC.start_link(opts)
-    flows = GenServer.call(r_conn, :flows)
+    # TODO: Drop hard link deps on RC and SC calls. lets get this working via registry
+    RC.start_link(opts)
+    [{r_conn, _}] = Registry.lookup(FlowdockConnectionRegistry, :rest_connection)
 
-    {:ok, s_conn} = SC.start_link(Keyword.put(opts, :flows, flows))
-    users = GenServer.call(r_conn, :users)
-    reduced_users = reduce(users, %{})
-    user = Enum.find(users, fn u -> u["nick"] == opts[:name] end)
+    SC.start_link(opts)
+    [{s_conn, _}] = Registry.lookup(FlowdockConnectionRegistry, :streaming_connection)
 
     Kernel.send(self(), :connection_ready)
 
-    {:ok, %State{conn: s_conn, rest_conn: r_conn, opts: opts, robot: robot, users: reduced_users, user_id: user["id"]}}
+    user = Enum.find(RC.users, fn u -> u["nick"] == opts[:name] end)
+
+    {:ok, %State{conn: s_conn,
+                 rest_conn: r_conn,
+                 opts: opts,
+                 robot: robot,
+                 users: reduce(RC.users, %{}),
+                 user_id: user["id"]}}
   end
 
-  def handle_cast({:send, msg}, %{rest_conn: r_conn} = state) do
-    GenServer.cast(r_conn, {:send_message, flowdock_message(msg)})
+  def handle_cast({:send, msg}, state) do
+    msg
+    |> flowdock_message
+    |> RC.send_message
 
     {:noreply, state}
   end
@@ -58,7 +68,7 @@ defmodule Hedwig.Adapters.Flowdock do
     {:noreply, state}
   end
 
-  def handle_cast({:message, content, flow_id, user, thread_id}, %{robot: robot, users: users} = state) do
+  def handle_cast({:message, content, flow_id, user, thread_id} = tup, %{robot: robot, users: users} = state) do
     msg = %Hedwig.Message{
       ref: make_ref(),
       room: flow_id,
@@ -75,6 +85,10 @@ defmodule Hedwig.Adapters.Flowdock do
     }
 
     if msg.text do
+      Logger.info("source=" <> msg.user.name <> " " <>
+                  "text="   <> msg.text      <> " " <>
+                  "ref="    <> inspect(msg.ref))
+
       Hedwig.Robot.handle_in(robot, msg)
     end
     {:noreply, state}
