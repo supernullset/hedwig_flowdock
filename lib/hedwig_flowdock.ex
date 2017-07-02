@@ -7,14 +7,9 @@ defmodule Hedwig.Adapters.Flowdock do
   alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
 
   defmodule State do
-    defstruct conn: nil,
-      rest_conn: nil,
-      flows: %{},
-      user_id: nil,
-      name: nil,
+    defstruct user_id: nil,
       opts: nil,
-      robot: nil,
-      users: %{}
+      robot: nil
   end
 
   def init({robot, opts}) do
@@ -23,8 +18,6 @@ defmodule Hedwig.Adapters.Flowdock do
 
     # TODO: Drop hard link deps on RC and SC calls. lets get this working via registry
     RC.start_link(opts)
-    [{r_conn, _}] = Registry.lookup(FlowdockConnectionRegistry, :rest_connection)
-
     SC.start_link(opts)
     [{s_conn, _}] = Registry.lookup(FlowdockConnectionRegistry, :streaming_connection)
 
@@ -32,12 +25,9 @@ defmodule Hedwig.Adapters.Flowdock do
 
     user = Enum.find(RC.users, fn u -> u["nick"] == opts[:name] end)
 
-    {:ok, %State{conn: s_conn,
-                 rest_conn: r_conn,
-                 opts: opts,
+    {:ok, %State{opts: opts,
                  robot: robot,
-                 users: reduce(RC.users, %{}),
-                 user_id: user["id"]}}
+                 user_id: Enum.find(RC.users, fn u -> u["nick"] == opts[:name] end)["id"]}}
   end
 
   def handle_cast({:send, msg}, state) do
@@ -48,27 +38,30 @@ defmodule Hedwig.Adapters.Flowdock do
     {:noreply, state}
   end
 
-  def handle_cast({:send_raw, msg}, %{rest_conn: r_conn} = state) do
-    GenServer.cast(r_conn, {:send_message, msg})
+  def handle_cast({:send_raw, msg}, state) do
+    msg
+    |> RC.send_message
 
     {:noreply, state}
   end
 
-  def handle_cast({:reply, %{user: user, text: text} = msg}, %{rest_conn: r_conn} = state) do
-    msg = %{msg | text: "@#{user.name}: #{text}"}
+  def handle_cast({:reply, %{user: user, text: text} = msg}, state) do
+    %{msg | text: "@#{user.name}: #{text}"}
+    |> flowdock_message
+    |> RC.send_message
 
-    GenServer.cast(r_conn, {:send_message, flowdock_message(msg)})
     {:noreply, state}
   end
 
-  def handle_cast({:emote, %{text: text, user: user} = msg}, %{rest_conn: r_conn} = state) do
-    msg = %{msg | text: "@#{user.name}: #{text}"}
+  def handle_cast({:emote, %{text: text, user: user} = msg}, state) do
+    %{msg | text: "@#{user.name}: #{text}"}
+    |> flowdock_message
+    |> RC.send_message
 
-    GenServer.cast(r_conn, {:send_message, flowdock_message(msg)})
     {:noreply, state}
   end
 
-  def handle_cast({:message, content, flow_id, user, thread_id} = tup, %{robot: robot, users: users} = state) do
+  def handle_cast({:message, content, flow_id, user, thread_id} = tup, %{robot: robot} = state) do
     msg = %Hedwig.Message{
       ref: make_ref(),
       room: flow_id,
@@ -80,7 +73,7 @@ defmodule Hedwig.Adapters.Flowdock do
       type: "message",
       user: %Hedwig.User{
         id: user,
-        name: users[user]["nick"]
+        name: reduce(RC.users, %{})[user]["nick"]
       }
     }
 
