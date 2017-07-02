@@ -54,6 +54,10 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     GenServer.call(pid(), :users)
   end
 
+  def flows do
+    GenServer.call(pid(), :flows)
+  end
+
   def pid do
     [{pid, _}] = Registry.lookup(FlowdockConnectionRegistry, :rest_connection)
     pid

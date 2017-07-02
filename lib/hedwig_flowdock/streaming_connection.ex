@@ -1,6 +1,8 @@
 defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
   use Connection
 
+  alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
+
   require Logger
 
   @timeout 5_000
@@ -25,8 +27,7 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     %URI{host: host, path: path} =
       URI.parse(opts[:endpoint] || @endpoint)
 
-    [{r_conn, _}] = Registry.lookup(FlowdockConnectionRegistry, :rest_connection)
-    flows = GenServer.call(r_conn, :flows)
+    flows = RC.flows
     opts =
       opts
       |> Keyword.put(:host, host)
@@ -45,6 +46,11 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
 
   def streaming_name do
     {:via, Registry, {FlowdockConnectionRegistry, :streaming_connection}}
+  end
+
+  def pid do
+    [{pid, _}] = Registry.lookup(FlowdockConnectionRegistry, :streaming_connection)
+    pid
   end
 
   def close(pid) do
