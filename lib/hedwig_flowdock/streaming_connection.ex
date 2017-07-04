@@ -1,6 +1,7 @@
 defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
   use Connection
 
+  alias Hedwig.Adapters.Flowdock, as: Adapter
   alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
 
   require Logger
@@ -15,10 +16,10 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     port: nil,
     ref: nil,
     token: nil,
+    adapter_pid: nil,
     username: nil,
     password: nil,
     query: nil,
-    owner: nil,
     flows: nil
 
   ### PUBLIC API ###
@@ -33,7 +34,6 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
       |> Keyword.put(:host, host)
       |> Keyword.put(:port, @ssl_port)
       |> Keyword.put(:path, path)
-      |> Keyword.put(:owner, self())
       |> Keyword.put(:flows, flows)
 
     opts = opts
@@ -136,12 +136,13 @@ defmodule Hedwig.Adapters.Flowdock.StreamingConnection do
     {:noreply, %{state | conn: conn}}
   end
 
-  def handle_info({:gun_data, conn, _ref, _is_fin, data}, %{owner: owner} = state) do
+  def handle_info({:gun_data, conn, _ref, _is_fin, data}, %{adapter_pid: pid} = state) do
     Regex.split(~r/\r\n/, data, trim: true)
     |> Enum.map(fn m ->
       decoded = Poison.decode!(m)
       if decoded["event"] == "message" do
-        GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"], decoded["thread_id"]})
+        Adapter.accept_message(pid,
+          decoded["content"], decoded["flow"], decoded["user"], decoded["thread_id"])
       end
     end)
 

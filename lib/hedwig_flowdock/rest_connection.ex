@@ -2,6 +2,8 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
   use Connection
 
   require Logger
+  alias Hedwig.Adapters.Flowdock, as: Adapter
+  alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
 
   @timeout 5_000
   @ssl_port 443
@@ -12,9 +14,9 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
             path: nil,
             port: nil,
             ref: nil,
+            adapter_pid: nil,
             token: nil,
             query: nil,
-            owner: nil,
             users: nil,
             flows: nil
 
@@ -29,7 +31,6 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
       |> Keyword.put(:host, host)
       |> Keyword.put(:port, @ssl_port)
       |> Keyword.put(:path, path)
-      |> Keyword.put(:owner, self())
 
     initial_state = struct(__MODULE__, opts)
 
@@ -95,7 +96,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     end
   end
 
-  def connect(:users, %{conn: conn, token: token, owner: _owner} = state) do
+  def connect(:users, %{conn: conn, token: token} = state) do
     encoded_pw = Base.encode64(token)
     headers = [{"authorization", "Basic #{encoded_pw}"}]
 
@@ -110,7 +111,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     end
   end
 
-  def connect(:flows, %{conn: conn, token: token, owner: _owner} = state) do
+  def connect(:flows, %{conn: conn, token: token} = state) do
     encoded_pw = Base.encode64(token)
     headers = [{"authorization", "Basic #{encoded_pw}"}]
 
@@ -126,8 +127,8 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     end
   end
 
-  def activity(%{users: users, owner: owner, flows: flows} = state) do
-    robot_name = GenServer.call(owner, {:robot_name})
+  def activity(%{users: users, flows: flows, adapter_pid: pid} = state) do
+    robot_name = Hedwig.Adapters.Flowdock.robot_name(pid)
     user = Enum.find(users, fn u -> u["nick"] == robot_name end)
 
     user |> inspect |> Logger.info
@@ -137,7 +138,7 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     flows
     |> Enum.each(fn (f) ->
       msg = %{flow: parameterize_flow(f), content: %{last_activity: last_activity}, event: "activity.user", user: user["id"]}
-      GenServer.cast(owner, {:send_raw, msg})
+      RC.send_message(msg)
     end)
 
     {:ok, state}
@@ -188,11 +189,12 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     {:noreply, %{state | conn: conn}}
   end
 
-  def handle_info({:gun_data, conn, _ref, _is_fin, data}, %{owner: owner} = state) do
+  def handle_info({:gun_data, conn, _ref, _is_fin, data}, %{adapter_pid: pid} = state) do
     decoded = Poison.decode!(data)
 
     if decoded["event"] == "message" do
-      GenServer.cast(owner, {:message, decoded["content"], decoded["flow"], decoded["user"], decoded["thread_id"]})
+      Adapter.accept_message(pid,
+        decoded["content"], decoded["flow"], decoded["user"], decoded["thread_id"])
     end
 
     {:noreply, %{state | conn: conn}}

@@ -3,7 +3,6 @@ defmodule Hedwig.Adapters.Flowdock do
 
   require Logger
   alias Hedwig.Adapters.Flowdock.ConnectionSupervisor, as: CS
-  alias Hedwig.Adapters.Flowdock.StreamingConnection, as: SC
   alias Hedwig.Adapters.Flowdock.RestConnection, as: RC
 
   defmodule State do
@@ -14,20 +13,24 @@ defmodule Hedwig.Adapters.Flowdock do
 
   def init({robot, opts}) do
     Logger.info "Booting up..."
-    {:ok, _} = Registry.start_link(:unique, FlowdockConnectionRegistry)
 
-    # TODO: Drop hard link deps on RC and SC calls. lets get this working via registry
-    RC.start_link(opts)
-    SC.start_link(opts)
-    [{s_conn, _}] = Registry.lookup(FlowdockConnectionRegistry, :streaming_connection)
+    opts
+    |> Keyword.put(:adapter_pid, self())
+    |> CS.start_link()
 
     Kernel.send(self(), :connection_ready)
-
-    user = Enum.find(RC.users, fn u -> u["nick"] == opts[:name] end)
 
     {:ok, %State{opts: opts,
                  robot: robot,
                  user_id: Enum.find(RC.users, fn u -> u["nick"] == opts[:name] end)["id"]}}
+  end
+
+  def robot_name(pid) do
+    GenServer.call(pid, {:robot_name})
+  end
+
+  def accept_message(pid, msg, flow, user, thread) do
+    GenServer.cast(pid, {:message, msg, flow, user, thread})
   end
 
   def handle_cast({:send, msg}, state) do
