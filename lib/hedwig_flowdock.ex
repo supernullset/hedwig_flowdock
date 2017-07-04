@@ -64,7 +64,7 @@ defmodule Hedwig.Adapters.Flowdock do
     {:noreply, state}
   end
 
-  def handle_cast({:message, content, flow_id, user, thread_id} = tup, %{robot: robot} = state) do
+  def handle_cast({:message, content, flow_id, user, thread_id}, %{robot: robot} = state) do
     msg = %Hedwig.Message{
       ref: make_ref(),
       room: flow_id,
