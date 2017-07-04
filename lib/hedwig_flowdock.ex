@@ -82,8 +82,7 @@ defmodule Hedwig.Adapters.Flowdock do
 
     if msg.text do
       Logger.info("source=" <> msg.user.name <> " " <>
-                  "text="   <> msg.text      <> " " <>
-                  "ref="    <> inspect(msg.ref))
+                  "text='"   <> msg.text      <> "' ")
 
       Hedwig.Robot.handle_in(robot, msg)
     end
