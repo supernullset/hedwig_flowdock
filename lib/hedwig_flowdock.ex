@@ -27,6 +27,8 @@ defmodule Hedwig.Adapters.Flowdock do
     reduced_users = reduce(users, %{})
     user = Enum.find(users, fn u -> u["nick"] == opts[:name] end)
 
+    Kernel.send(self(), :connection_ready)
+
     {:ok, %State{conn: s_conn, rest_conn: r_conn, opts: opts, robot: robot, users: reduced_users, user_id: user["id"]}}
   end
 
@@ -63,6 +65,7 @@ defmodule Hedwig.Adapters.Flowdock do
       private: %{
         thread_id: thread_id
       },
+      robot: robot,
       text: content,
       type: "message",
       user: %Hedwig.User{
@@ -72,7 +75,7 @@ defmodule Hedwig.Adapters.Flowdock do
     }
 
     if msg.text do
-      Hedwig.Robot.handle_message(robot, msg)
+      Hedwig.Robot.handle_in(robot, msg)
     end
     {:noreply, state}
   end
@@ -86,7 +89,7 @@ defmodule Hedwig.Adapters.Flowdock do
   end
 
   def handle_info(:connection_ready, %{robot: robot} = state) do
-    Hedwig.Robot.after_connect(robot)
+    Hedwig.Robot.handle_connect(robot)
     {:noreply, state}
   end
 

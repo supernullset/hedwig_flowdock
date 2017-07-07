@@ -11,9 +11,9 @@ defmodule HedwigFlowdock.Mixfile do
       elixir: "~> 1.2",
       build_embedded: Mix.env == :prod,
       start_permanent: Mix.env == :prod,
-      package: package,
+      package: package(),
       description: "A Flowdock adapter for Hedwig",
-      deps: deps
+      deps: deps()
     ]
   end
 
@@ -25,7 +25,7 @@ defmodule HedwigFlowdock.Mixfile do
     [
       {:connection, "~> 1.0"},
       {:gun, "1.0.0-pre.1"},
-      {:hedwig, github: "hedwig-im/hedwig"},
+      {:hedwig, "~> 1.0"},
       {:poison, "~> 2.0"},
       {:ex_doc, ">= 0.0.0", only: :dev}
     ]
