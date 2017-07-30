@@ -131,7 +131,6 @@ defmodule Hedwig.Adapters.Flowdock.RestConnection do
     robot_name = Hedwig.Adapters.Flowdock.robot_name(pid)
     user = Enum.find(users, fn u -> u["nick"] == robot_name end)
 
-    user |> inspect |> Logger.info
     {mega, secs, _} = :erlang.timestamp()
     last_activity = mega*1000000 + secs
 
