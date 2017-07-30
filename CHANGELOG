@@ -1,0 +1,10 @@
+2017-07-29 Sean Williamson <sean.j.williamson@gmail.com>
+	* Package: Update Hedwig and Hedwig API calls
+
+	* hedwig_flowdock.ex: Modify init to start up a supervisor
+	responsible for maintaining REST and streaming connections to the
+	Flowdock API
+
+	* mix.exs: Bump minor version
+
+	* CHANGELOG: Add a changelog to keep track of all changes
