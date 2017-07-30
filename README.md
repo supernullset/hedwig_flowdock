@@ -38,7 +38,10 @@ Add `hedwig_flowdock` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
-  [{:hedwig_flowdock, "0.1"}]
+  [
+    {:hedwig, github: "hedwig-im/hedwig"},
+    {:hedwig_flowdock, "0.1"}
+  ]
 end
 ```
 
@@ -46,7 +49,7 @@ Ensure `hedwig_flowdock` is started before your application:
 
 ```elixir
 def application do
-  [applications: [:hedwig_flowdock]]
+  [applications: [:hedwig, :hedwig_flowdock]]
 end
 ```
 
